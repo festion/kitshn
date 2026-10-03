@@ -36,7 +36,8 @@ make our own adjustments to the app.
   so builds run in CI: `.github/workflows/android-debug.yml`.
   - Every PR / push to `main` uploads `kitshn-debug-<sha>.apk` as a run artifact.
   - Push to `main` also replaces the **`debug-latest`** pre-release — open
-    `https://github.com/festion/kitshn/releases/tag/debug-latest` on the phone.
+    `https://github.com/festion/kitshn/releases/tag/debug-latest` on the phone;
+    the direct file is `.../releases/download/debug-latest/kitshn-debug.apk`.
   - Signed with a FIXED debug key (repo secret `DEBUG_KEYSTORE_BASE64`, source of
     truth Infisical `KITSHN_DEBUG_KEYSTORE_B64`) so each build installs as an
     update over the last. Losing/replacing that key means uninstalling the

@@ -63,6 +63,8 @@ jobs:
         id: keystore
         env:
           DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+          EXPECTED_CERT_SHA256: >-
+            93:2E:17:E3:46:F9:C6:61:C1:FA:AF:CB:5C:85:CC:51:8F:4A:07:D9:7C:07:B2:7B:F3:03:7C:F0:B3:53:F5:E9
         run: |
           set -euo pipefail
           if [ -z "${DEBUG_KEYSTORE_BASE64}" ]; then
@@ -77,6 +79,15 @@ jobs:
           # standard debug credentials; otherwise AGP would silently replace it.
           keytool -list -keystore ~/.android/debug.keystore \
             -storepass android -alias androiddebugkey >/dev/null
+          # And fail if it is a DIFFERENT key: a wrong secret would still
+          # open, still sign, and ship an APK the phone refuses as an update.
+          actual="$(keytool -list -v -keystore ~/.android/debug.keystore \
+            -storepass android -alias androiddebugkey \
+            | sed -n 's/^[[:space:]]*SHA256: *//p')"
+          if [ "${actual}" != "${EXPECTED_CERT_SHA256}" ]; then
+            echo "::error::debug keystore cert SHA-256 is '${actual}', expected '${EXPECTED_CERT_SHA256}'"
+            exit 1
+          fi
           echo "fixed=true" >> "$GITHUB_OUTPUT"
 
       - name: Build debug APK
@@ -143,8 +154,16 @@ jobs:
         run: |
           set -euo pipefail
           test -f "${APK}"
-          gh release delete debug-latest --cleanup-tag --yes 2>/dev/null || true
-          gh release create debug-latest "${APK}#kitshn-debug.apk" \
+          # Stable asset name, so the phone can bookmark
+          # releases/download/debug-latest/kitshn-debug.apk
+          # (`file#label` only changes the display label, not the name).
+          cp "${APK}" out/kitshn-debug.apk
+          # Delete only if present, so a real failure (auth, rate limit) is
+          # not swallowed.
+          if gh release view debug-latest >/dev/null 2>&1; then
+            gh release delete debug-latest --cleanup-tag --yes
+          fi
+          gh release create debug-latest out/kitshn-debug.apk \
             --target "${GITHUB_SHA}" --prerelease \
             --title "Debug build ${GITHUB_SHA::8}" \
             --notes "Debug APK of festion/kitshn at ${GITHUB_SHA} (run ${GITHUB_RUN_ID}). Installs beside the Play Store kitshn as app id suffix .debug."
