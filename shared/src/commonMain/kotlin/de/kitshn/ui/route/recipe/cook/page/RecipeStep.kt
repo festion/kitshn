@@ -72,7 +72,10 @@ fun RouteRecipeCookPageStep(
     recipe: TandoorRecipe,
     step: TandoorStep,
     servingsFactor: Double,
-    showFractionalValues: Boolean
+    showFractionalValues: Boolean,
+    // festion fork: true when the ingredients are on cook mode's own
+    // Ingredients page instead (they are not split across steps).
+    hideIngredients: Boolean = false
 ) {
     val coroutineScope = rememberCoroutineScope()
     val fetchRequestState = rememberTandoorRequestState()
@@ -199,7 +202,7 @@ fun RouteRecipeCookPageStep(
                 label = { Text(step.time.formatDuration()) }
             )
 
-            if(step.ingredients.isEmpty()) {
+            if(step.ingredients.isEmpty() || hideIngredients) {
                 if(step.step_recipe != null) RecipeStepRecipeLink(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -218,13 +221,15 @@ fun RouteRecipeCookPageStep(
                     rightMaxWidth = 300.dp,
                     leftMinWidth = 300.dp,
                     disable = maxHeight > 800.dp || disableSideBySideLayout,
-                    leftLayout = {
-                        StepBody(
-                            if(it) (maxHeightPx / 2.5f).roundToInt() else maxHeightPx,
-                            it
+                    leftLayout = { sideBySide ->
+                        // festion fork: when stacked (phones), the instructions
+                        // render AFTER the ingredients, in the right slot below.
+                        if(sideBySide) StepBody(
+                            (maxHeightPx / 2.5f).roundToInt(),
+                            true
                         )
                     }
-                ) {
+                ) { sideBySide ->
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -266,6 +271,8 @@ fun RouteRecipeCookPageStep(
                             )
                         }
                     }
+
+                    if(!sideBySide) StepBody(maxHeightPx, false)
                 }
             }
         }

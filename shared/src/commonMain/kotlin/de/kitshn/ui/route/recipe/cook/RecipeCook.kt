@@ -37,9 +37,13 @@ import de.kitshn.ui.component.buttons.BackButtonType
 import de.kitshn.ui.component.model.recipe.step.RecipeStepIndicator
 import de.kitshn.ui.route.RouteParameters
 import de.kitshn.ui.route.recipe.cook.page.RouteRecipeCookPageDone
+import de.kitshn.ui.route.recipe.cook.page.RouteRecipeCookPageIngredients
 import de.kitshn.ui.route.recipe.cook.page.RouteRecipeCookPageStep
 import de.kitshn.ui.state.foreverRememberPagerState
+import kitshn.shared.generated.resources.Res
+import kitshn.shared.generated.resources.common_ingredients
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -87,8 +91,16 @@ fun RouteRecipeCook(
         sortedSteps.addAll(recipe!!.sortSteps())
     }
 
+    // festion fork: if the ingredients are not split across steps (at most one
+    // step has any, typical for imported recipes), show them on their own page
+    // before step 1 and hide them on the step pages.
+    val ingredientsSplitAcrossSteps = sortedSteps.count { it.ingredients.isNotEmpty() } > 1
+    val unsplitIngredients = sortedSteps.flatMap { it.ingredients }
+    val showIngredientsPage = !ingredientsSplitAcrossSteps && unsplitIngredients.isNotEmpty()
+    val pageOffset = if(showIngredientsPage) 1 else 0
+
     val pagerState =
-        foreverRememberPagerState(key = "RouteRecipeCook/pagerState/${recipe!!.id}") { sortedSteps.size + 1 }
+        foreverRememberPagerState(key = "RouteRecipeCook/pagerState/${recipe!!.id}") { pageOffset + sortedSteps.size + 1 }
 
     hapticFeedback.handlePagerState(pagerState)
 
@@ -132,15 +144,24 @@ fun RouteRecipeCook(
                         recipe = recipe!!,
                         servings = servings.roundToInt()
                     )
+                } else if(index < pageOffset) {
+                    RouteRecipeCookPageIngredients(
+                        topPadding = topPadding,
+                        vm = p.vm,
+                        ingredients = unsplitIngredients,
+                        servingsFactor = servingsFactor,
+                        showFractionalValues = ingredientsShowFractionalValues.value
+                    )
                 } else {
-                    val step = sortedSteps[index]
+                    val step = sortedSteps[index - pageOffset]
                     RouteRecipeCookPageStep(
                         topPadding = topPadding,
                         vm = p.vm,
                         recipe = recipe!!,
                         step = step,
                         servingsFactor = servingsFactor,
-                        showFractionalValues = ingredientsShowFractionalValues.value
+                        showFractionalValues = ingredientsShowFractionalValues.value,
+                        hideIngredients = showIngredientsPage
                     )
                 }
             }
@@ -152,7 +173,9 @@ fun RouteRecipeCook(
                     steps = sortedSteps,
                     selected = pagerState.currentPage,
                     includeFinishIndicator = true,
-                    bottomPadding = it.calculateBottomPadding()
+                    bottomPadding = it.calculateBottomPadding(),
+                    leadingItemText = if(showIngredientsPage)
+                        stringResource(Res.string.common_ingredients) else null
                 ) {
                     coroutineScope.launch {
                         pagerState.animateScrollToPage(it)

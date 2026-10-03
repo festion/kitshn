@@ -1,49 +1,50 @@
 # Project Index: kitshn
+
 ## 1. Core Purpose
-Kitshn is an unofficial multiplatform client for the self-hostable Tandoor Recipes application, built with Kotlin Multiplatform (Compose) and Material 3 Expressive. This specific fork (`festion/kitshn`) includes custom adjustments for personal use, primarily targeting Android, iOS, and Desktop.
+
+`kitshn` is a Kotlin Multiplatform (Compose) client for the Tandoor Recipes self-hosted application. This repository is a personal fork of the main `kitshn-app/kitshn` project, containing specific modifications for the operator's use. The app targets Android, iOS, and Desktop platforms.
 
 ## 2. Architecture
-The project follows a multiplatform architecture using Kotlin Multiplatform and Jetpack Compose.
-- **`shared`**: Contains common business logic, data models, and database schemas.
-- **`composeApp`**: Houses common Compose UI components and logic that can be shared across platforms.
-- **`androidApp`**: Android-specific application code and resources.
-- **`iosApp`**: iOS-specific application code and resources.
-- **`desktopApp`**: Desktop-specific application code and resources.
-- **`web`**: Project documentation website, built with VitePress.
-- **`e2e/mtls-test-server`**: Contains end-to-end testing infrastructure, including a Docker Compose setup for a test server.
-- **`fastlane`**: Automates mobile application deployment tasks.
-- **`.github/workflows`**: Defines CI/CD pipelines using GitHub Actions for various platforms and tasks (Android debug builds, desktop distribution, Flatpak, web deployment, secret scanning).
+
+The project follows a standard Kotlin Multiplatform structure, managed by Gradle.
+- **`shared/`**: Contains the core business logic, UI components (with Compose), and data layers common to all platforms.
+- **`androidApp/`**, **`iosApp/`**, **`desktopApp/`**: Platform-specific modules that act as entry points and handle platform-specific implementations and packaging.
+- **`web/`**: A VitePress-based documentation website for the project.
+- **UI**: Built with Jetpack Compose and Material 3 Expressive.
+- **Fork-specific changes**: This fork disables ACRA crash reporting and modifies UI layouts (e.g., ingredient order). These changes are marked with a `festion fork:` comment in the code.
 
 ## 3. Key Files
-- `.claude/PROJECT_INDEX.md`: This project index file.
-- `README.md`: Project overview, installation instructions, and key features.
-- `CLAUDE.md`: Fork-specific instructions, branch management, Android build details, and notes on custom changes.
-- `build.gradle.kts`: Root Gradle build configuration for the multiplatform project.
-- `gradle/libs.versions.toml`: Centralized dependency versions and plugin management for Gradle.
-- `androidApp/build.gradle.kts`: Gradle build script for the Android application module.
-- `desktopApp/build.gradle.kts`: Gradle build script for the Desktop application module.
-- `iosApp/iosApp.swift`: The main entry point for the iOS application.
-- `shared/build.gradle.kts`: Gradle build script for the shared module.
-- `shared/schemas/de.kitshn.AppDatabase/1.json`: Schema definition for the application's database.
-- `composeApp/src/commonMain/composeResources/`: Directory for common Compose resources (e.g., `aboutlibraries.json`, `social_media_import_script.js`).
-- `.github/workflows/android-debug.yml`: GitHub Actions workflow for building Android debug APKs.
-- `fastlane/Fastfile`: Fastlane configuration for mobile release automation.
-- `web/package.json`: Node.js package configuration for the web documentation site.
-- `web/.vitepress/config.mts`: Configuration for the VitePress-based website.
-- `e2e/mtls-test-server/docker-compose.yml`: Defines the services for the E2E test server.
+
+- **`CLAUDE.md`**: **Crucial read.** Contains instructions specific to this fork, including build procedures, CI details, remotes, and summaries of all local modifications.
+- **`build.gradle.kts` & `settings.gradle.kts`**: Root Gradle configuration files for the multiplatform project.
+- **`gradle/libs.versions.toml`**: The Gradle Version Catalog, defining all project dependencies and their versions.
+- **`shared/src/commonMain/`**: Location of the primary shared Kotlin code (ViewModels, data models, Composables).
+- **`.github/workflows/android-debug.yml`**: The primary CI workflow for building debug APKs for Android. Pushes to `main` update a `debug-latest` GitHub release.
+- **`kitshn.properties`**: Configuration for upstream services, though some (like ACRA) are disabled in this fork.
 
 ## 4. Dependencies
-- **Kotlin Multiplatform**: Core framework for sharing code across platforms.
-- **Jetpack Compose**: UI toolkit used for building the user interface across Android, iOS, and Desktop.
-- **Gradle**: Build automation system.
-- **Fastlane**: Tool for automating iOS and Android deployment.
-- **VitePress**: Static site generator used for the `web` documentation.
-- **Tandoor Recipes**: The self-hostable backend application that Kitshn clients interact with.
-- Dependencies managed via `gradle/libs.versions.toml` (Kotlin, Compose, etc.) and `web/package.json` (Node.js packages).
+
+- **Build System**: Gradle with Kotlin DSL.
+- **Core Framework**: Kotlin Multiplatform.
+- **UI**: Jetpack Compose for Multiplatform, Material 3 Expressive.
+- **Dependency Management**: Dependencies are centralized in `gradle/libs.versions.toml`.
 
 ## 5. Common Tasks
-- **Syncing with upstream**: `git fetch upstream && git merge upstream/main` (on a feature branch).
-- **Building Android Debug APK**: `./gradlew :androidApp:assembleDebug`.
-- **Creating Pull Requests**: `gh pr create --repo festion/kitshn --base main` (to target the correct fork and branch).
-- **Running Gradle tasks**: General build, clean, and test tasks using `./gradlew`.
-- **Managing GitHub Actions**: Monitoring and triggering CI/CD workflows in `.github/workflows`.
+
+- **Build a debug APK for Android**:
+  ```bash
+  ./gradlew :androidApp:assembleDebug
+  ```
+  Note: The primary build method is via CI as described in `CLAUDE.md`. The resulting APK is available as a GitHub release artifact.
+
+- **List all fork-specific code modifications**:
+  ```bash
+  grep -rn "festion fork:" --include='*.kt' .
+  ```
+
+- **Sync with the upstream repository**:
+  On a feature branch, run:
+  ```bash
+  git fetch upstream && git merge upstream/main
+  ```
+  Then open a PR against this fork's `main` branch.

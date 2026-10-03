@@ -65,8 +65,7 @@ Each edit carries a `festion fork:` comment; `grep -rn "festion fork:" --include
   instructions (upstream: header → instructions → ingredients). Side-by-side
   layout is unchanged. Applies wherever `RecipeStepCard` is used: the recipe
   view and the step list in the recipe editor (`creationandedit/StepsPage.kt`).
-  Cook mode (`cook/page/RecipeStep.kt`) is separate and still stacks
-  instructions first.
+  Cook mode has its own version, below.
 - **Unsplit ingredients go above the steps** — `RecipeDetails.kt`. If at most
   one step has ingredients (typical for imported recipes), the full list shows
   above the steps and step cards hide theirs. If ingredients are split across
@@ -75,6 +74,13 @@ Each edit carries a `festion fork:` comment; `grep -rn "festion fork:" --include
   `sortedIngredientsList` holds every ingredient twice.
 - **Activity card at the bottom** — `RecipeDetails.kt`. The cook-log preview
   moved from under the description to below the properties card.
+- **Cook mode, same rules** — `cook/RecipeCook.kt`, `cook/page/RecipeStep.kt`,
+  new `cook/page/RecipeIngredients.kt`, `RecipeStepIndicator.kt`.
+  - Ingredients not split across steps: an **Ingredients** page comes before
+    step 1, with a leading tab in the step bar (`leadingItemText`; with it set,
+    indicator indexes are PAGE indexes). Step pages hide their list.
+  - Split across steps: on a stacked (phone) step page the ingredients render
+    above the instructions. Side by side is unchanged.
 
 ## Fleet conventions applied here
 
