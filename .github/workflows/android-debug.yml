@@ -7,7 +7,7 @@ name: Android debug APK
 # - A push to main (or a manual run on main) also replaces the rolling
 #   `debug-latest` pre-release, which a phone browser can download directly.
 #
-# SIGNING. AGP signs debug builds with ~/.android/debug.keystore and creates a
+# SIGNING. AGP signs debug builds with $ANDROID_USER_HOME/debug.keystore and creates a
 # fresh random one when it is missing — so without a fixed key every CI build
 # has a different signature, and Android refuses to install a build over the
 # previous one ("App not installed"). The fixed key lives in the repo secret
@@ -46,6 +46,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      # AGP reads the debug keystore from $ANDROID_USER_HOME/debug.keystore.
+      # Set it explicitly: relying on the ~/.android default was measured to
+      # fail on ubuntu-latest (run 37152576370 restored the key to
+      # ~/.android and the APK was still signed by a different, generated
+      # key).
+      ANDROID_USER_HOME: ${{ github.workspace }}/../android-user-home
+      EXPECTED_CERT_SHA256: >-
+        93:2E:17:E3:46:F9:C6:61:C1:FA:AF:CB:5C:85:CC:51:8F:4A:07:D9:7C:07:B2:7B:F3:03:7C:F0:B3:53:F5:E9
     outputs:
       apk_name: ${{ steps.apk.outputs.name }}
       signed_with_fixed_key: ${{ steps.keystore.outputs.fixed }}
@@ -63,25 +72,30 @@ jobs:
         id: keystore
         env:
           DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
-          EXPECTED_CERT_SHA256: >-
-            93:2E:17:E3:46:F9:C6:61:C1:FA:AF:CB:5C:85:CC:51:8F:4A:07:D9:7C:07:B2:7B:F3:03:7C:F0:B3:53:F5:E9
         run: |
           set -euo pipefail
+          # Paths only, no values: which Android home variables the runner sets.
+          for v in ANDROID_USER_HOME ANDROID_PREFS_ROOT ANDROID_SDK_HOME ANDROID_HOME; do
+            echo "${v}=${!v:-<unset>}"
+          done
+          mkdir -p "${ANDROID_USER_HOME}"
           if [ -z "${DEBUG_KEYSTORE_BASE64}" ]; then
             echo "::warning::DEBUG_KEYSTORE_BASE64 is not available; signing with a throwaway key. This APK will NOT install over an earlier build."
             echo "fixed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          printf '%s' "${DEBUG_KEYSTORE_BASE64}" | base64 -d > "${ANDROID_USER_HOME}/debug.keystore"
+          chmod 600 "${ANDROID_USER_HOME}/debug.keystore"
+          # Belt and braces: also the legacy default location.
           mkdir -p ~/.android
-          printf '%s' "${DEBUG_KEYSTORE_BASE64}" | base64 -d > ~/.android/debug.keystore
-          chmod 600 ~/.android/debug.keystore
+          cp "${ANDROID_USER_HOME}/debug.keystore" ~/.android/debug.keystore
           # Fail loudly if the secret is not a keystore AGP can open with the
           # standard debug credentials; otherwise AGP would silently replace it.
-          keytool -list -keystore ~/.android/debug.keystore \
+          keytool -list -keystore "${ANDROID_USER_HOME}/debug.keystore" \
             -storepass android -alias androiddebugkey >/dev/null
           # And fail if it is a DIFFERENT key: a wrong secret would still
           # open, still sign, and ship an APK the phone refuses as an update.
-          actual="$(keytool -list -v -keystore ~/.android/debug.keystore \
+          actual="$(keytool -list -v -keystore "${ANDROID_USER_HOME}/debug.keystore" \
             -storepass android -alias androiddebugkey \
             | sed -n 's/^[[:space:]]*SHA256: *//p')"
           if [ "${actual}" != "${EXPECTED_CERT_SHA256}" ]; then
@@ -97,6 +111,8 @@ jobs:
 
       - name: Locate, rename and fingerprint the APK
         id: apk
+        env:
+          KEYSTORE_FIXED: ${{ steps.keystore.outputs.fixed }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -110,13 +126,32 @@ jobs:
           cp "${apks[0]}" "out/${name}"
           echo "name=${name}" >> "$GITHUB_OUTPUT"
           apksigner="$(ls "${ANDROID_HOME}"/build-tools/*/apksigner | sort -V | tail -1)"
+          # apksigner prints one digest line per signature scheme/signer
+          # ("Signer #1 ..." or "V2 Signer: ..." depending on version).
+          # Collect the distinct digests; anything but exactly one fails below.
+          signer="$("${apksigner}" verify --print-certs "out/${name}" \
+            | sed -n -E 's/^.*[Ss]igner.*certificate SHA-256 digest: *//p' \
+            | sort -u | paste -sd' ')"
+          expected="$(printf '%s' "${EXPECTED_CERT_SHA256}" | tr -d ':' | tr 'A-F' 'a-f')"
           {
             echo "### ${name}"
             echo '```'
-            echo "APK sha256: $(sha256sum "out/${name}" | cut -d' ' -f1)"
-            "${apksigner}" verify --print-certs "out/${name}" | grep -i 'SHA-256'
+            echo "APK sha256:        $(sha256sum "out/${name}" | cut -d' ' -f1)"
+            echo "signer cert sha256: ${signer:-<none>}"
+            echo "expected (fixed):   ${expected}"
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
+          # The check that matters: the APK itself, not the keystore we
+          # restored. A passing keystore check proved nothing in run
+          # 37152576370 because the build never read that file.
+          if [ -z "${signer}" ] || [[ "${signer}" == *" "* ]]; then
+            echo "::error::expected exactly one signer digest, got '${signer}'"
+            exit 1
+          fi
+          if [ "${KEYSTORE_FIXED}" = "true" ] && [ "${signer}" != "${expected}" ]; then
+            echo "::error::APK is not signed by the fixed debug key; it will not install as an update."
+            exit 1
+          fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
