@@ -63,8 +63,10 @@ Each edit carries a `festion fork:` comment; `grep -rn "festion fork:" --include
 - **Ingredients above step text on phones** — `RecipeStepCard.kt`. When the
   card is too narrow for side by side, it stacks header → ingredients →
   instructions (upstream: header → instructions → ingredients). Side-by-side
-  layout is unchanged. Recipe view only; cook mode (`cook/page/RecipeStep.kt`)
-  still stacks instructions first.
+  layout is unchanged. Applies wherever `RecipeStepCard` is used: the recipe
+  view and the step list in the recipe editor (`creationandedit/StepsPage.kt`).
+  Cook mode (`cook/page/RecipeStep.kt`) is separate and still stacks
+  instructions first.
 
 ## Fleet conventions applied here
 
