@@ -1,0 +1,206 @@
+name: Android debug APK
+
+# Builds the `debug` variant of androidApp (applicationId suffix `.debug`, so it
+# installs BESIDE the Play Store kitshn) for sideloading on the operator's phone.
+#
+# - Every run uploads the APK as a workflow artifact.
+# - A push to main (or a manual run on main) also replaces the rolling
+#   `debug-latest` pre-release, which a phone browser can download directly.
+#
+# SIGNING. AGP signs debug builds with $ANDROID_USER_HOME/debug.keystore and creates a
+# fresh random one when it is missing — so without a fixed key every CI build
+# has a different signature, and Android refuses to install a build over the
+# previous one ("App not installed"). The fixed key lives in the repo secret
+# DEBUG_KEYSTORE_BASE64 (source of truth: Infisical KITSHN_DEBUG_KEYSTORE_B64).
+# It uses AGP's standard debug alias and passwords (androiddebugkey / android),
+# so no other secret is needed. Expected signer cert SHA-256:
+#   93:2E:17:E3:46:F9:C6:61:C1:FA:AF:CB:5C:85:CC:51:8F:4A:07:D9:7C:07:B2:7B:F3:03:7C:F0:B3:53:F5:E9
+# After the build, the APK's own signer digest is checked against that value
+# (checking the restored keystore alone was measured to prove nothing).
+# A run without the secret (e.g. a PR from someone else's fork) still builds,
+# with a throwaway key and a warning, and never publishes the release.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'web/**'
+      - '**/*.md'
+      - '.claude/**'
+      - 'fastlane/**'
+      - 'images/**'
+  pull_request:
+    paths-ignore:
+      - 'web/**'
+      - '**/*.md'
+      - '.claude/**'
+      - 'fastlane/**'
+      - 'images/**'
+  workflow_dispatch:
+
+concurrency:
+  group: android-debug-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # AGP reads the debug keystore from $ANDROID_USER_HOME/debug.keystore.
+      # Set it explicitly: relying on the ~/.android default was measured to
+      # fail on ubuntu-latest (run 37152576370 restored the key to
+      # ~/.android and the APK was still signed by a different, generated
+      # key).
+      ANDROID_USER_HOME: ${{ github.workspace }}/../android-user-home
+      EXPECTED_CERT_SHA256: >-
+        93:2E:17:E3:46:F9:C6:61:C1:FA:AF:CB:5C:85:CC:51:8F:4A:07:D9:7C:07:B2:7B:F3:03:7C:F0:B3:53:F5:E9
+    outputs:
+      apk_name: ${{ steps.apk.outputs.name }}
+      signed_with_fixed_key: ${{ steps.keystore.outputs.fixed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Restore the fixed debug keystore
+        id: keystore
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          # Paths only, no values: which Android home variables the runner sets.
+          for v in ANDROID_USER_HOME ANDROID_PREFS_ROOT ANDROID_SDK_HOME ANDROID_HOME; do
+            echo "${v}=${!v:-<unset>}"
+          done
+          mkdir -p "${ANDROID_USER_HOME}"
+          if [ -z "${DEBUG_KEYSTORE_BASE64}" ]; then
+            echo "::warning::DEBUG_KEYSTORE_BASE64 is not available; signing with a throwaway key. This APK will NOT install over an earlier build."
+            echo "fixed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf '%s' "${DEBUG_KEYSTORE_BASE64}" | base64 -d > "${ANDROID_USER_HOME}/debug.keystore"
+          chmod 600 "${ANDROID_USER_HOME}/debug.keystore"
+          # Belt and braces: also the legacy default location.
+          mkdir -p ~/.android
+          cp "${ANDROID_USER_HOME}/debug.keystore" ~/.android/debug.keystore
+          # Fail loudly if the secret is not a keystore AGP can open with the
+          # standard debug credentials; otherwise AGP would silently replace it.
+          keytool -list -keystore "${ANDROID_USER_HOME}/debug.keystore" \
+            -storepass android -alias androiddebugkey >/dev/null
+          # And fail if it is a DIFFERENT key: a wrong secret would still
+          # open, still sign, and ship an APK the phone refuses as an update.
+          actual="$(keytool -list -v -keystore "${ANDROID_USER_HOME}/debug.keystore" \
+            -storepass android -alias androiddebugkey \
+            | sed -n 's/^[[:space:]]*SHA256: *//p')"
+          if [ "${actual}" != "${EXPECTED_CERT_SHA256}" ]; then
+            echo "::error::debug keystore cert SHA-256 is '${actual}', expected '${EXPECTED_CERT_SHA256}'"
+            exit 1
+          fi
+          echo "fixed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build debug APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :androidApp:assembleDebug --no-daemon --stacktrace
+
+      - name: Locate, rename and fingerprint the APK
+        id: apk
+        env:
+          KEYSTORE_FIXED: ${{ steps.keystore.outputs.fixed }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apks=(androidApp/build/outputs/apk/debug/*.apk)
+          if [ "${#apks[@]}" -ne 1 ]; then
+            echo "::error::expected exactly 1 debug APK, found ${#apks[@]}: ${apks[*]:-none}"
+            exit 1
+          fi
+          name="kitshn-debug-${GITHUB_SHA::8}.apk"
+          mkdir -p out
+          cp "${apks[0]}" "out/${name}"
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+          apksigner="$(ls "${ANDROID_HOME}"/build-tools/*/apksigner | sort -V | tail -1)"
+          # apksigner prints one digest line per signature scheme/signer
+          # ("Signer #1 ..." or "V2 Signer: ..." depending on version).
+          # Collect the distinct digests; anything but exactly one fails below.
+          signer="$("${apksigner}" verify --print-certs "out/${name}" \
+            | sed -n -E 's/^.*[Ss]igner.*certificate SHA-256 digest: *//p' \
+            | sort -u | paste -sd' ')"
+          expected="$(printf '%s' "${EXPECTED_CERT_SHA256}" | tr -d ':' | tr 'A-F' 'a-f')"
+          {
+            echo "### ${name}"
+            echo '```'
+            echo "APK sha256:        $(sha256sum "out/${name}" | cut -d' ' -f1)"
+            echo "signer cert sha256: ${signer:-<none>}"
+            echo "expected (fixed):   ${expected}"
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          # The check that matters: the APK itself, not the keystore we
+          # restored. A passing keystore check proved nothing in run
+          # 37152576370 because the build never read that file.
+          if [ -z "${signer}" ] || [[ "${signer}" == *" "* ]]; then
+            echo "::error::expected exactly one signer digest, got '${signer}'"
+            exit 1
+          fi
+          if [ "${KEYSTORE_FIXED}" = "true" ] && [ "${signer}" != "${expected}" ]; then
+            echo "::error::APK is not signed by the fixed debug key; it will not install as an update."
+            exit 1
+          fi
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.apk.outputs.name }}
+          path: out/${{ steps.apk.outputs.name }}
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    # Only main, and only when signed with the fixed key — a throwaway-key APK
+    # on the release page would break the phone's update path.
+    needs: build
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      github.event_name != 'pull_request' &&
+      needs.build.outputs.signed_with_fixed_key == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: android-debug-publish
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ needs.build.outputs.apk_name }}
+          path: out
+
+      - name: Replace the debug-latest pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          APK: out/${{ needs.build.outputs.apk_name }}
+        run: |
+          set -euo pipefail
+          test -f "${APK}"
+          # Stable asset name, so the phone can bookmark
+          # releases/download/debug-latest/kitshn-debug.apk
+          # (`file#label` only changes the display label, not the name).
+          cp "${APK}" out/kitshn-debug.apk
+          # Delete only if present, so a real failure (auth, rate limit) is
+          # not swallowed.
+          if gh release view debug-latest >/dev/null 2>&1; then
+            gh release delete debug-latest --cleanup-tag --yes
+          fi
+          gh release create debug-latest out/kitshn-debug.apk \
+            --target "${GITHUB_SHA}" --prerelease \
+            --title "Debug build ${GITHUB_SHA::8}" \
+            --notes "Debug APK of festion/kitshn at ${GITHUB_SHA} (run ${GITHUB_RUN_ID}). Installs beside the Play Store kitshn as app id suffix .debug."
