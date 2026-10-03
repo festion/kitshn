@@ -1,49 +1,45 @@
 # Project Index: kitshn
 ## 1. Core Purpose
-`kitshn` is an unofficial multiplatform client for the self-hostable Tandoor Recipes application, built with Compose and Material 3 Expressive. This specific fork (`festion/kitshn`) introduces custom adjustments while maintaining compatibility with the upstream project. It aims to provide a modern, intuitive, and responsive user experience across Android, iOS, and Desktop platforms for managing recipes, meal plans, and shopping lists.
+`kitshn` is a Kotlin Multiplatform (Compose) client for the self-hostable **Tandoor Recipes** application. This repository is a fork of the official `kitshn-app/kitshn` project, maintained by `festion` to apply specific adjustments. The application aims to provide a modern, intuitive, and responsive user experience across Android, iOS, and Desktop platforms, offering features like recipe management, meal planning, shopping lists, and social media importing.
 
 ## 2. Architecture
-The project employs a Kotlin Multiplatform architecture, separating platform-specific code from shared logic and UI.
--   **`shared` module**: Contains common Kotlin code, business logic, and Compose Multiplatform UI components used across all platforms.
--   **`androidApp`**: Android-specific implementation, building debug, nightly, and release APKs.
--   **`iosApp`**: iOS-specific implementation for native integration.
--   **`desktopApp`**: Desktop-specific implementation, including packaging for Linux (AppImage) and potentially Windows/macOS.
--   **`composeApp`**: Likely contains the root Compose Multiplatform application entry point and shared UI resources.
--   **`web`**: Houses the project's public website and documentation, built with VitePress.
--   **`fastlane`**: Manages mobile app release automation, including versioning, changelogs, screenshots, and release notes.
--   **`.github/workflows`**: Implements CI/CD pipelines for Android builds, desktop distribution, Flatpak, nightly builds, and secret scanning.
+The project is built using **Kotlin Multiplatform** with **Compose** and **Material 3 Expressive** for the UI. It targets Android, iOS, and Desktop platforms.
+- **`shared`**: Contains common Kotlin Multiplatform code, including application logic and database schemas.
+- **`composeApp`**: Holds common Compose UI code that is shared across platforms.
+- **`androidApp`**: Android-specific application module.
+- **`iosApp`**: iOS-specific application module.
+- **`desktopApp`**: Desktop-specific application module.
+- **`web`**: Hosts the project's documentation and static site.
 
 ## 3. Key Files
--   **`CLAUDE.md`**: Internal project instructions for this fork, detailing build processes, Git remote management, and specific configuration notes related to `kitshn.properties`.
--   **`.claude/PROJECT_INDEX.md`**: This generated project index.
--   **`README.md`**: Public-facing documentation, installation instructions, features, and screenshots.
--   **`build.gradle.kts` (root)**: Top-level Gradle build configuration.
--   **`gradle/libs.versions.toml`**: Centralized dependency versions and plugin management for Gradle.
--   **`kitshn.properties`**: Upstream configuration for services like ACRA crash reporting, funding links, and share wrapper URLs.
--   **`androidApp/build.gradle.kts`**: Gradle build script for the Android application module.
--   **`shared/build.gradle.kts`**: Gradle build script for the shared Kotlin Multiplatform module.
--   **`shared/schemas/de.kitshn.AppDatabase/1.json`**: Defines the database schema for the application.
--   **`fastlane/`**: Directory containing Fastlane automation scripts for mobile releases.
--   **`flatpak/app.kitshn.kitshn.yml`**: Flatpak manifest for desktop application packaging.
--   **`.github/workflows/*.yml`**: GitHub Actions workflow definitions for continuous integration and deployment tasks.
--   **`e2e/mtls-test-server/`**: Contains scripts and configurations (`docker-compose.yml`, `nginx.conf`, `setup-certs.sh`) for an mTLS end-to-end testing server environment.
--   **`web/`**: Contains the VitePress website configuration (`.vitepress/config.mts`), markdown content (`web/*.md`, `web/docs/`), and static assets (`web/public/`).
--   **`.gitleaks.toml`, `.gitleaksignore`**: Configuration files for gitleaks, used for secret scanning.
+- **`README.md`**: Main project overview, installation instructions, features, and screenshots.
+- **`CLAUDE.md`**: Project instructions specific to the `festion` fork, detailing remotes, build processes for the phone, and upstream configuration notes (e.g., ACRA crash collector being disabled).
+- **`.github/workflows/`**: GitHub Actions workflows for CI/CD, including Android debug builds, desktop distributions, Flatpak builds, nightly builds, and secret scanning.
+- **`androidApp/`**: Android application source, `build.gradle.kts` for configuration, and `proguard-rules.pro`.
+- **`composeApp/src/commonMain/composeResources/`**: Shared Compose resources, including `aboutlibraries.json` and `social_media_import_script.js`.
+- **`desktopApp/`**: Desktop application source, build scripts, icons, and packaging configurations (e.g., AppImage).
+- **`iosApp/`**: iOS application source, project configuration, and asset catalogs.
+- **`shared/`**: Contains core multiplatform logic, `build.gradle.kts`, `proguard-rules.pro`, and database schemas under `schemas/`.
+- **`web/`**: Markdown files for documentation (`contact.md`, `download.md`, `funding.md`, `index.md`, `screenshots.md`, `translate.md`, `docs/`) and `package.json` for web dependencies.
+- **`fastlane/`**: Fastlane configurations for mobile automation, including actions for versioning, changelog updates, and screenshot taking.
+- **`flatpak/`**: Flatpak manifest and related files for Linux desktop distribution.
+- **`gradle/libs.versions.toml`**: Centralized dependency versions for Gradle.
+- **`.gitleaks.toml`**: Gitleaks configuration for detecting sensitive information.
+- **`kitshn.properties`**: Configuration file containing upstream service pointers and ACRA settings (ACRA is disabled in this fork).
 
 ## 4. Dependencies
--   **Kotlin Multiplatform**: Core framework for cross-platform development.
--   **Jetpack Compose / Compose Multiplatform**: UI toolkit for Android, Desktop, and shared UI.
--   **Material 3 Expressive**: Design system for the UI.
--   **Gradle**: Build automation system.
--   **Fastlane**: Mobile CI/CD toolchain for Android and iOS.
--   **GitHub Actions**: CI/CD platform for automated builds, tests, and deployments.
--   **Tandoor Recipes (backend)**: The external self-hostable application this client interacts with.
--   **VitePress**: Static site generator for the project's documentation website.
+- **Kotlin Multiplatform**: Core framework for cross-platform development.
+- **Jetpack Compose**: UI toolkit for Android and Desktop, extended by Compose Multiplatform.
+- **Fastlane**: For automating mobile release processes on Android and iOS.
+- **Gradle**: Build automation system.
+- **Tandoor Recipes**: The self-hostable backend application that `kitshn` clients interact with.
+- **Weblate**: Used for localization and translation management.
 
 ## 5. Common Tasks
--   **Building Android Debug APK**: Run `./gradlew :androidApp:assembleDebug`. The output APK is in `androidApp/build/outputs/apk/debug/`.
--   **Syncing with Upstream**: `git fetch upstream && git merge upstream/main` (on a feature branch, then PR).
--   **Creating Pull Requests**: When creating a PR for this fork, always specify `--repo festion/kitshn --base main`.
--   **Secret Scanning**: GitHub Actions workflow `.github/workflows/secret-scan.yml` is run on pushes to `main` and PRs.
--   **Translation**: Contributions are managed on Weblate (hosted.weblate.org/projects/kitshn/).
--   **Website Management**: Content under the `web/` directory is built and served by VitePress.
+- **Syncing with upstream**: `git fetch upstream && git merge upstream/main` (to be performed on a feature branch, then PR to `festion/kitshn`).
+- **Building Android debug APK**: `./gradlew :androidApp:assembleDebug` (output in `androidApp/build/outputs/apk/debug/`).
+- **Creating Pull Requests**: PRs should be made against `festion/kitshn` and specify `--base main`.
+- **Pushing changes**: Use `git pushx` to ensure `.claude/PROJECT_INDEX.md` is regenerated.
+- **Secret Scanning**: `.github/workflows/secret-scan.yml` runs on push to `main` and PRs.
+- **ACRA Crash Reporting**: Disabled in this fork; relevant code has `festion fork:` comments.
+- **Work Tracking**: Managed via Vikunja project `kitshn`.

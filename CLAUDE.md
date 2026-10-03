@@ -45,10 +45,14 @@ make our own adjustments to the app.
 
 ## Upstream config to know about (`kitshn.properties`)
 
-- `acra.http.*` sends crash reports to **upstream's** ACRA collector
-  (`acra.kitshn.app`). Builds of this fork report there too until that is
-  changed. The login/password in that file are upstream's, public by design;
-  they are exempted from gitleaks by fingerprint in `.gitleaksignore`.
+- `acra.http.*` points at **upstream's** ACRA crash collector (`acra.kitshn.app`).
+  **ACRA is disabled in this fork** (kitshn #4243): `AndroidApp.attachBaseContext`
+  no longer calls `initKitshnAcra()`, and `CrashReporting.android.kt` returns a
+  null handler, which hides the "send crash report" buttons as on desktop. Both
+  edits carry a `festion fork:` comment — keep them when merging upstream. The
+  values are still compiled into BuildConfig but nothing reads them. The
+  login/password are upstream's, public by design, and exempted from gitleaks
+  by fingerprint in `.gitleaksignore`.
 - `funding.*`, `about.*`, `share.wrapper.url` also point at upstream services.
 
 ## Fleet conventions applied here
