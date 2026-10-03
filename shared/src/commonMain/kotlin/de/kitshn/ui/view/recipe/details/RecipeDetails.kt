@@ -315,6 +315,12 @@ fun ViewRecipeDetails(
     val sortedIngredientsList = remember { mutableStateListOf<TandoorIngredient>() }
     val sortedAndMergedIngredientsList = remember { mutableStateListOf<TandoorIngredient>() }
 
+    // festion fork: are the ingredients actually allocated to steps? Imported
+    // recipes usually put every ingredient on one step. Then the full list goes
+    // above the steps and no step card repeats it.
+    val ingredientsSplitAcrossSteps =
+        sortedStepsList.count { it.ingredients.isNotEmpty() } > 1
+
     // sort steps and ingredients
     LaunchedEffect(recipe) {
         val beginLoading = Clock.System.now().toEpochMilliseconds()
@@ -818,21 +824,7 @@ fun ViewRecipeDetails(
                         )
                     }
 
-                    if(!appearanceHideActivity.value) {
-                        // cook logs cannot be fetched when viewing a shared recipe
-                        if(shareToken == null) RecipeActivityPreviewCard(
-                            Modifier
-                                .padding(
-                                    start = 16.dp,
-                                    end = 16.dp,
-                                    bottom = 8.dp
-                                )
-                                .fillMaxWidth(),
-                            recipe = recipe
-                        ) {
-                            recipe?.let { recipeActivitiesBottomSheetState.open(it) }
-                        }
-                    }
+                    // festion fork: the activity card moved to the bottom of the page.
 
                     if(enoughSpace) SourceButton()
                 }
@@ -898,7 +890,11 @@ fun ViewRecipeDetails(
                         }
                     }
 
-                    if(recipe?.steps?.size != 1) Box(
+                    // festion fork: upstream showed this list only for multi-step
+                    // recipes, so a one-step recipe had its ingredients inside
+                    // "Step 1". Always show it above the steps.
+                    if(pageLoadingState == ErrorLoadingSuccessState.LOADING
+                        || sortedAndMergedIngredientsList.isNotEmpty()) Box(
                         Modifier.padding(
                             start = 16.dp,
                             end = 16.dp,
@@ -966,7 +962,9 @@ fun ViewRecipeDetails(
                         recipe = recipe,
                         step = step,
                         stepIndex = index,
-                        hideIngredients = step.ingredients.size == sortedIngredientsList.size,
+                        // festion fork: upstream compared against sortedIngredientsList,
+                        // which holds every ingredient twice, so this never hid.
+                        hideIngredients = !ingredientsSplitAcrossSteps,
                         servingsFactor = servingsFactor,
                         enableTickingOff = true,
                         showFractionalValues = ingredientsShowFractionalValues.value,
@@ -1014,6 +1012,23 @@ fun ViewRecipeDetails(
                 },
                 showFractionalValues = propertiesShowFractionalValues.value
             )
+
+            // festion fork: moved here from the header (below the description).
+            if(!appearanceHideActivity.value) {
+                // cook logs cannot be fetched when viewing a shared recipe
+                if(shareToken == null) RecipeActivityPreviewCard(
+                    Modifier
+                        .padding(
+                            start = 16.dp,
+                            end = 16.dp,
+                            bottom = 16.dp
+                        )
+                        .fillMaxWidth(),
+                    recipe = recipe
+                ) {
+                    recipe?.let { recipeActivitiesBottomSheetState.open(it) }
+                }
+            }
 
             if(notEnoughSpace){
                 Box(modifier = Modifier.height(48.dp)){

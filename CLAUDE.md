@@ -67,6 +67,14 @@ Each edit carries a `festion fork:` comment; `grep -rn "festion fork:" --include
   view and the step list in the recipe editor (`creationandedit/StepsPage.kt`).
   Cook mode (`cook/page/RecipeStep.kt`) is separate and still stacks
   instructions first.
+- **Unsplit ingredients go above the steps** — `RecipeDetails.kt`. If at most
+  one step has ingredients (typical for imported recipes), the full list shows
+  above the steps and step cards hide theirs. If ingredients are split across
+  steps, upstream behaviour stays (full list on top plus each step's own).
+  Also replaces upstream's `hideIngredients` compare, which never fired because
+  `sortedIngredientsList` holds every ingredient twice.
+- **Activity card at the bottom** — `RecipeDetails.kt`. The cook-log preview
+  moved from under the description to below the properties card.
 
 ## Fleet conventions applied here
 
