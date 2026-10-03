@@ -157,12 +157,17 @@ fun RecipeStepIndicator(
     selected: Int,
     includeFinishIndicator: Boolean,
     bottomPadding: Dp,
+    // festion fork: optional item before the steps (cook mode's Ingredients
+    // page). When set, every index (selected, onClick) is a PAGE index: the
+    // leading item is page 0 and the steps start at page 1.
+    leadingItemText: String? = null,
     onClick: (item: Int) -> Unit
 ) {
     val lazyRowState = rememberLazyListState()
     LaunchedEffect(selected) { lazyRowState.animateScrollToItem(selected) }
 
-    val mCount = if(includeFinishIndicator) steps.size + 1 else steps.size
+    val offset = if(leadingItemText != null) 1 else 0
+    val mCount = offset + if(includeFinishIndicator) steps.size + 1 else steps.size
 
     BoxWithConstraints {
         val minWidth = (this.maxWidth / mCount).coerceAtLeast(64.dp)
@@ -173,38 +178,51 @@ fun RecipeStepIndicator(
                 .fillMaxWidth(),
             state = lazyRowState
         ) {
-            items(steps.size) {
-                val step = steps[it]
+            if(leadingItemText != null) item {
+                RecipeStepIndicatorTextItem(
+                    text = leadingItemText,
+                    selected = true,
+                    minWidth = minWidth,
+                    maxWidth = if(minWidth > maxWidth) minWidth else maxWidth,
+                    bottomPadding = bottomPadding
+                ) {
+                    onClick(0)
+                }
+            }
+
+            items(steps.size) { stepIndex ->
+                val step = steps[stepIndex]
+                val page = stepIndex + offset
 
                 if(step.name.isNotBlank()) {
                     RecipeStepIndicatorTextItem(
                         text = step.name,
-                        selected = it <= selected,
+                        selected = page <= selected,
                         minWidth = minWidth,
                         maxWidth = if(minWidth > maxWidth) minWidth else maxWidth,
                         bottomPadding = bottomPadding
                     ) {
-                        onClick(it)
+                        onClick(page)
                     }
                 } else {
                     RecipeStepIndicatorIntItem(
-                        item = it + 1,
-                        selected = it <= selected,
+                        item = stepIndex + 1,
+                        selected = page <= selected,
                         width = minWidth,
                         bottomPadding = bottomPadding
                     ) {
-                        onClick(it)
+                        onClick(page)
                     }
                 }
             }
 
             if(includeFinishIndicator) item {
                 RecipeStepIndicatorFinishItem(
-                    selected = selected == steps.size,
+                    selected = selected == steps.size + offset,
                     width = minWidth,
                     bottomPadding = bottomPadding
                 ) {
-                    onClick(steps.size)
+                    onClick(steps.size + offset)
                 }
             }
         }
