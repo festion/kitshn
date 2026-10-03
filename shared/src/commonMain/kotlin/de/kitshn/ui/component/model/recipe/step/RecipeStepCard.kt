@@ -76,15 +76,15 @@ fun RecipeStepCard(
         colors = colors,
         onClick = { }
     ) {
-        @Composable
-        fun Instructions() {
-            val stepName = (step?.name ?: "").ifBlank {
-                stringResource(
-                    Res.string.common_step,
-                    stepIndex + 1
-                )
-            }
+        val stepName = (step?.name ?: "").ifBlank {
+            stringResource(
+                Res.string.common_step,
+                stepIndex + 1
+            )
+        }
 
+        @Composable
+        fun StepHeader() {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -120,7 +120,10 @@ fun RecipeStepCard(
                     appendAction()
                 }
             }
+        }
 
+        @Composable
+        fun StepInstructions() {
             MarkdownRichTextWithTimerDetection(
                 modifier = Modifier
                     .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
@@ -132,6 +135,12 @@ fun RecipeStepCard(
                     onStartTimer(fromSeconds, toSeconds, timerName)
                 }
             )
+        }
+
+        @Composable
+        fun Instructions() {
+            StepHeader()
+            StepInstructions()
         }
 
         Column(
@@ -150,10 +159,14 @@ fun RecipeStepCard(
                     rightMaxWidth = 500.dp,
                     leftMinWidth = 300.dp,
                     disable = disableSideBySideLayout,
-                    leftLayout = {
-                        Instructions()
+                    leftLayout = { sideBySide ->
+                        // festion fork: when stacked (phone width), the order is
+                        // header -> ingredients -> instructions, so ingredients
+                        // sit ABOVE the step text. Side by side is unchanged.
+                        StepHeader()
+                        if(sideBySide) StepInstructions()
                     }
-                ) {
+                ) { sideBySide ->
                     Box(
                         Modifier.padding(8.dp)
                     ) {
@@ -173,6 +186,8 @@ fun RecipeStepCard(
                             }
                         )
                     }
+
+                    if(!sideBySide) StepInstructions()
                 }
             } else {
                 Instructions()
