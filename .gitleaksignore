@@ -1,0 +1,14 @@
+# Repo-local gitleaks exemptions, by FINGERPRINT (file:rule:line), not by path.
+#
+# Both are upstream kitshn's ACRA crash-report HTTP basic-auth LOGIN, committed
+# in public kitshn-app/kitshn and compiled into every released APK. It is the
+# upstream maintainer's reporting credential, not ours, and it is public by
+# design, so rotating or scrubbing it is not ours to do.
+#
+# Fingerprints, not a path entry: a path exemption on kitshn.properties would
+# also hide any credential WE add to that file later (e.g. retargeting ACRA at
+# our own collector). A fingerprint is pinned to one rule on one line, so if
+# upstream moves the line the finding reappears and fails the gate loudly,
+# which is the safe direction.
+kitshn.properties:generic-api-key:8
+web/docs/build-and-config.md:generic-api-key:30
