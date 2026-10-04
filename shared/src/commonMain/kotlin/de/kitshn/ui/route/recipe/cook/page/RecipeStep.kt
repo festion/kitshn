@@ -256,13 +256,16 @@ fun RouteRecipeCookPageStep(
                                 onNotEnoughSpace = {
                                     disableSideBySideLayout = true
                                 },
-                                onOpenRecipe = {
+                                onOpenRecipe = { foodRecipe ->
                                     coroutineScope.launch {
                                         fetchRequestState.wrapRequest {
                                             // fetch full recipe using id and show recipe link dialog
 
-                                            val recipe = vm.tandoorClient!!.recipe.retrieve(recipe.id)
-                                            recipeLinkDialogState.open(recipe.toOverview())
+                                            // festion fork: upstream retrieved `recipe.id`, i.e. the
+                                            // recipe being cooked, so a linked-recipe ingredient
+                                            // reopened the current recipe. Use the tapped one.
+                                            val linked = vm.tandoorClient!!.recipe.retrieve(foodRecipe.id)
+                                            recipeLinkDialogState.open(linked.toOverview())
                                         }
                                     }
                                 },

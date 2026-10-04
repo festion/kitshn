@@ -81,6 +81,9 @@ Each edit carries a `festion fork:` comment; `grep -rn "festion fork:" --include
     indicator indexes are PAGE indexes). Step pages hide their list.
   - Split across steps: on a stacked (phone) step page the ingredients render
     above the instructions. Side by side is unchanged.
+- **Cook-mode linked-recipe fix** — `cook/page/RecipeStep.kt`. Tapping an
+  ingredient that links to another recipe opened the recipe being cooked
+  (upstream retrieved `recipe.id`); it now opens the tapped recipe.
 
 ## Fleet conventions applied here
 
